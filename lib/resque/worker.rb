@@ -139,6 +139,7 @@ module Resque
             procline "Forked #{@child} at #{Time.now.to_i}"
             Process.wait(@child)
           else
+            unregister_signal_handlers unless @cant_fork
             procline "Processing #{job.queue} since #{Time.now.to_i}"
             perform(job, &block)
             exit! unless @cant_fork
@@ -278,6 +279,18 @@ module Resque
       end
 
       log! "Registered signals"
+    end
+
+    def unregister_signal_handlers
+      trap('TERM', 'DEFAULT')
+      trap('INT', 'DEFAULT')
+
+      begin
+        trap('QUIT', 'DEFAULT')
+        trap('USR1', 'DEFAULT')
+        trap('USR2', 'DEFAULT')
+      rescue ArgumentError
+      end
     end
 
     # Schedule this worker for shutdown. Will finish processing the
