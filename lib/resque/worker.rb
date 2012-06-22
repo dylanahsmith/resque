@@ -138,11 +138,12 @@ module Resque
             srand # Reseeding
             procline "Forked #{@child} at #{Time.now.to_i}"
             Process.wait(@child)
+            job.fail(DirtyExit.new($?.to_s)) if $?.signaled?
           else
             unregister_signal_handlers unless @cant_fork
             procline "Processing #{job.queue} since #{Time.now.to_i}"
             perform(job, &block)
-            exit! unless @cant_fork
+            exit!(true) unless @cant_fork
           end
 
           done_working
