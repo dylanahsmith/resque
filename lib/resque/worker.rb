@@ -140,10 +140,17 @@ module Resque
             Process.wait(@child)
             job.fail(DirtyExit.new($?.to_s)) if $?.signaled?
           else
-            unregister_signal_handlers unless @cant_fork
-            procline "Processing #{job.queue} since #{Time.now.to_i}"
-            perform(job, &block)
-            exit!(true) unless @cant_fork
+            begin
+              unregister_signal_handlers unless @cant_fork
+              procline "Processing #{job.queue} since #{Time.now.to_i}"
+              perform(job, &block)
+            rescue Object => e
+              raise e if @cant_fork
+              $stderr.puts "Unhandled error in forked worker: #{e.message} (#{e.class})"
+              $stderr.puts *e.backtrace.map { |line| "    #{line}"}
+            ensure
+              exit!(true) unless @cant_fork
+            end
           end
 
           done_working
