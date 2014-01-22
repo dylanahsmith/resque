@@ -134,12 +134,7 @@ module Resque
           run_hook :before_fork, job
           working_on job
 
-          if @child = fork
-            srand # Reseeding
-            procline "Forked #{@child} at #{Time.now.to_i}"
-            Process.wait(@child)
-            job.fail(DirtyExit.new($?.to_s)) if $?.signaled?
-          else
+          @child = fork do
             begin
               unregister_signal_handlers unless @cant_fork
               procline "Processing #{job.queue} since #{Time.now.to_i}"
@@ -151,6 +146,13 @@ module Resque
             ensure
               exit!(true) unless @cant_fork
             end
+          end
+
+          if @child
+            srand # Reseeding
+            procline "Forked #{@child} at #{Time.now.to_i}"
+            Process.wait(@child)
+            job.fail(DirtyExit.new($?.to_s)) if $?.signaled?
           end
 
           done_working
@@ -229,17 +231,21 @@ module Resque
     def fork
       @cant_fork = true if $TESTING
 
-      return if @cant_fork
+      if @cant_fork
+        yield
+        return
+      end
 
       begin
         # IronRuby doesn't support `Kernel.fork` yet
         if Kernel.respond_to?(:fork)
-          Kernel.fork
+          Kernel.fork { yield }
         else
           raise NotImplementedError
         end
       rescue NotImplementedError
         @cant_fork = true
+        yield
         nil
       end
     end
