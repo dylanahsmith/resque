@@ -369,7 +369,12 @@ module Resque
     # USR2: Don't process any new jobs
     # CONT: Start processing jobs again after a USR2
     def register_signal_handlers
-      trap('TERM') { shutdown  }
+      if ENV["BORG"]
+        trap('TERM') { shutdown  }
+      else
+        trap('TERM') { shutdown!  }
+      end
+
       trap('INT')  { shutdown!  }
 
       begin
