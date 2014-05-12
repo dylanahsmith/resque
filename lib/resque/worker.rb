@@ -182,7 +182,16 @@ module Resque
             rescue SystemCallError
               nil
             end
-            job.fail(DirtyExit.new($?.to_s)) if $?.signaled?
+
+            if $?.signaled?
+              if (hash = processing) && !hash.empty?
+                job = Job.new(hash['queue'], hash['payload'])
+                job.worker = self
+                job.fail(DirtyExit.new($?.to_s))
+              else
+                log "Forked child for #{job.inspect} failed : #{$?.to_s}"
+              end
+            end
           else
             unregister_signal_handlers if will_fork? && term_child
             begin
